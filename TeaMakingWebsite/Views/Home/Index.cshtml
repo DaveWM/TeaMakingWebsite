@@ -1,0 +1,127 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+@section scripts
+{
+    <script>
+        $(document).ready(function () {
+            $('#confirmModal').modal({ keyboard: false, backdrop: "static", show: false });
+        });
+        function MainController($scope) {
+            $scope.Users = [];
+
+            var hub = $.connection.mainHub;
+            hub.client.AddUser = function (name, ready) {
+                $scope.Users.push({ "Username": name, "Ready": ready });
+                $scope.$apply();
+            };
+            hub.client.RemoveUser = function (username) {
+                $scope.Users = $scope.Users.filter(function (element) {
+                    return element.Username != username;
+                });
+                $scope.$apply();
+            };
+            hub.client.SetUserReady = function (name, ready) {
+                if(name == "@User.Identity.Name") {
+                    $('#btnToggleReady').toggleClass('btn-primary',!ready);
+                    $('#btnToggleReady').toggleClass('btn-success',ready);
+                } else {
+                    for (var i = 0; i < $scope.Users.length; i++) {
+                        if ($scope.Users[i].Username == name) {
+                            $scope.Users[i].Ready = ready;
+                            $scope.$apply();
+                            break;
+                        }
+                    }
+                }
+            };
+            $scope.MakerName = "";
+
+            hub.client.MakeTea = function () {
+                $('#confirmModal').modal('show');
+            };
+            hub.client.TeaBeingMade = function (name) {
+                $scope.MakerName = name;
+                $scope.$apply();
+                $('#makingAlert').addClass('in');
+                PlaySound("@Url.Content("~/Content/TeaReady.ogg")");
+            };
+            $.connection.hub.qs = { "Username": "@User.Identity.Name" };
+            $.connection.hub.start().done(function () {
+                $('#btnToggleReady').click(function () {
+                    hub.server.toggleReady();
+                });
+            });
+            $('#AcceptMaking').click(function () {
+                AcceptOrDecline(true);
+            });
+            $('#DeclineMaking').click(function () {
+                AcceptOrDecline(false);
+                PlaySound("@Url.Content("~/Content/suityourself.ogg")");
+            });
+            
+            function AcceptOrDecline(value) {
+                $('#confirmModal').modal('hide');
+                $('#confirmModal').one('hidden.bs.modal', function () {
+                    hub.server.acceptOrDeclineMaking(value);
+                });
+            }
+            function PlaySound(path) {
+                var audio = new Audio();
+                audio.src = path;
+                audio.play();
+            }
+        }
+    </script>
+}
+<div ng-controller="MainController">
+    <div id="makingAlert" class="alert alert-info fade">
+        <a class="close" data-dismiss="alert" href="#" aria-hidden="true">&times;</a>
+        <p>{{MakerName}} is making the tea</p> 
+    </div>
+    <table class="table table-striped">
+        <thead>
+            <th>User</th>
+            <th>Ready for Tea</th>
+        </thead>
+        <tbody>
+            <tr ng-repeat="user in Users">
+                <td>{{user.Username}}</td>
+                <td>
+                    <i ng-show="user.Ready" class="fa fa-thumbs-up fa-2x"></i>
+                    <i ng-hide="user.Ready" class="fa fa-thumbs-down fa-2x"></i>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <button class="btn-lg btn-primary" id="btnToggleReady"><i class="fa fa-coffee"></i> Toggle Ready</button>
+    <audio id="SuitYourself">
+        <source src="@Url.Content("~/Content/suityourself.ogg")" type='audio/ogg; codecs="vorbis"'>
+    </audio>
+    
+    <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Make the Tea</h4>
+                </div>
+                <div class="modal-body">
+                    <p>You've been chosen to make the tea. Are you going to?</p>
+                </div>
+                <div class="modal-footer row">
+                    <div class="col-sm-6">
+                        <button type="button" class="btn btn-danger btn-block" id="DeclineMaking"><i class="fa fa-frown-o"></i> Nope, I'm too lazy</button>
+                    </div>
+                    <div class="col-sm-6">
+                        <button type="button" class="btn btn-success btn-block" id="AcceptMaking"><i class="fa fa-coffee"></i> Yes</button>
+                    </div>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+</div>
+
+
+
+
